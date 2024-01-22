@@ -3,17 +3,16 @@ require "sinatra/content_for"
 require "tilt/erubis"
 
 require_relative "database_persistence"
+require_relative "mongo_persistence"
 
 configure do
-  # enable :sessions
-  # set :session_secret, '8e9c95423171256ba9e8c1f59b4bc8572b3ed2dafdf4b521944205bec36bddd4'
   set :erb, escape_html: true
 end
 
-configure(:development) do
-  require "sinatra/reloader"
-  also_reload "database_persistence.rb"
-end
+# configure(:development) do
+#   require "sinatra/reloader"
+#   also_reload "database_persistence.rb"
+# end
 
 helpers do
   def list_complete?(list)
@@ -65,6 +64,7 @@ end
 
 before do
   @storage = DatabasePersistance.new(logger)
+  @trash = MongoPersistence.new(logger)
 end
 
 get "/" do
@@ -74,6 +74,7 @@ end
 # View list of lists
 get "/lists" do
   @lists = @storage.all_lists
+  @recently_deleted_todos = @trash.all_items
   erb :lists, layout: :layout
 end
 
@@ -133,6 +134,10 @@ end
 # Delete a todo list
 post "/lists/:id/destroy" do
   id = params[:id].to_i
+  todo_names = @storage.get_list_todo_names(id)
+  if todo_names.size > 1
+    @trash.add_items([todo_names])
+  end
   @storage.delete_list(id)
   session[:success] = "The list has been deleted."
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
@@ -166,6 +171,8 @@ post "/lists/:list_id/todos/:id/destroy" do
   @list = load_list(@list_id)
 
   todo_id = params[:id].to_i
+  todo_name = @storage.get_todo_name(@list_id, todo_id)
+  @trash.add_item(todo_name[0])
   @storage.delete_todo_from_list(@list_id, todo_id)
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
     status 204

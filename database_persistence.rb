@@ -3,7 +3,7 @@ require "pg"
 class DatabasePersistance
   def initialize(logger)
     @db = PG.connect(dbname: "todos")
-    @logger = logger
+    # @logger = logger
     setup_tables
   end
 
@@ -53,6 +53,15 @@ class DatabasePersistance
     query(sql, todo_name, list_id)
   end
 
+  def get_todo_name(list_id, todo_id)
+    sql = "SELECT * FROM todos WHERE list_id = $1 AND id = $2"
+    result = query(sql, list_id, todo_id)
+
+    result.map do |todo|
+      { name: todo["name"] }
+    end
+  end
+
   def delete_todo_from_list(list_id, todo_id)
     sql = "DELETE FROM todos WHERE list_id = $1 AND id = $2"
     query(sql, list_id, todo_id)
@@ -66,6 +75,15 @@ class DatabasePersistance
   def mark_all_todos_as_completed(list_id)
     sql = "UPDATE todos SET completed = true WHERE list_id = $1"
     query(sql, list_id)
+  end
+
+  def get_list_todo_names(id)
+    todo_sql = "SELECT * FROM todos WHERE list_id = $1"
+    todo_result = query(todo_sql, id)
+
+    todo_result.map do |todo_tuple|
+      { name: todo_tuple["name"] }
+    end
   end
 
   def todo_tuples(id)
@@ -82,7 +100,7 @@ class DatabasePersistance
   private
 
   def query(sql, *params)
-    @logger.info "#{sql}: #{params}"
+    # @logger.info "#{sql}: #{params}"
     @db.exec_params(sql, params)
   end
 
